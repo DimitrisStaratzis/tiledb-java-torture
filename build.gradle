@@ -1,0 +1,23 @@
+plugins {
+    id 'application'
+    id 'eclipse'
+    id 'java'
+}
+
+group = 'com.glencoesoftware'
+version = '0.1.0-SNAPSHOT'
+
+mainClassName = 'com.glencoesoftware.tiledb.Main'
+
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'io.tiledb:tiledb-java:0.17.9'
+    implementation 'org.openmicroscopy:ome-common:6.0.17'
+}
+
