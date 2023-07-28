@@ -57,6 +57,7 @@ import io.tiledb.java.api.Filter;
 import io.tiledb.java.api.FilterList;
 import io.tiledb.java.api.Pair;
 import io.tiledb.java.api.Query;
+import io.tiledb.java.api.QueryStatus;
 import io.tiledb.java.api.SubArray;
 import io.tiledb.java.api.TileDBError;
 import io.tiledb.java.api.ZstdFilter;
@@ -223,8 +224,6 @@ public class Main implements AutoCloseable {
             .order(ByteOrder.nativeOrder());
         try (Query query = new Query(array, TILEDB_WRITE);
              SubArray subarray = new SubArray(ctx, array)) {
-            System.out.println(String.format(
-                    "Inserting rectangle: [%d, %d]", x0, y0));
             query.setLayout(TILEDB_ROW_MAJOR);
             subarray.addRange(0, t, t, null);
             subarray.addRange(1, c, c, null);
@@ -233,7 +232,9 @@ public class Main implements AutoCloseable {
             subarray.addRange(4, x0, x1, null);
             query.setSubarray(subarray);
             query.setDataBuffer("a1", asByteBuffer);
-            query.submit();
+            QueryStatus status = query.submit();
+            System.out.println(String.format(
+                    "Inserted rectangle: [%d, %d]; status: %s", x0, y0, status));
         }
     }
 
