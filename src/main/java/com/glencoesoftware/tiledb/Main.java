@@ -66,36 +66,64 @@ import loci.common.image.SimpleImageScaler;
 
 public class Main implements AutoCloseable {
 
+    /** Tile size in the X dimension */
     private final int tileSizeX = 1000;
 
+    /** Tile size in the Y dimension */
     private final int tileSizeY = 1000;
 
+    /** Number of timepoints */
     private final int sizeT = 1;
 
+    /** Number of channels */
     private final int sizeC = 20;
 
+    /** Number of sections/slices in the axial plane */
     private final int sizeZ = 1;
 
+    /** Height of the image */
     private final int sizeY = 22000;
 
+    /** Width of the image */
     private final int sizeX = 13000;
 
+    /**
+     * TileDB array data type which reflects an unsigned 16-bit integer pixel
+     * type
+     */
     private final Datatype attrType = Datatype.TILEDB_UINT16;
 
+    /** Number of bytes in memory that a single pixel (TileDB cell) occupies */
     private final int bytesPerPixel;
 
+    /** Whether the data is of 3 channel unsigned 8-bit integer pixel type */
     private final boolean rgb = false;
 
+    /** Root where the TileDB arrays will be created, one per resolution */
     private final Path tileDbRoot;
 
+    /** Java string vs. string representation of the desired TileDB config */
     private final Map<String, String> tileDbConfig;
 
+    /**
+     * Number of parallel workers that will be reading and writing from the
+     * various TileDB arrays.
+     */
     private final int maxWorkers = 4;
 
+    /**
+     * Fixed thread pool executor of {@link maxWorkers} size where tile read
+     * and write operations will be performed.
+     */
     private final ExecutorService executor;
 
+    /** Number of resolutions we will process */
     private final int resolutions = 2;
 
+    /**
+     * Tile to tile random overlap bounds which will used to simulate real
+     * world non-adjacent writes.
+     */
     private final int overlap = 100;
 
     public static void main(String[] args) throws Exception {
