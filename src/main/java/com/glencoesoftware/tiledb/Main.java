@@ -129,6 +129,22 @@ public class Main implements AutoCloseable {
         executor = Executors.newFixedThreadPool(this.maxWorkers);
     }
 
+    private String _toString(SubArray subarray) throws TileDBError {
+        // Assume 5 dimensions
+        List<String> slices = new ArrayList<String>();
+        for (int dimIdx = 0; dimIdx < 5; dimIdx++) {
+            assert subarray.getRangeNum(dimIdx) == 1;
+            Pair<Object, Object> range = subarray.getRange(dimIdx, 0);
+            slices.add(String.join(":",
+                    range.getFirst().toString(),
+                    range.getSecond().toString()
+                ));
+        }
+        return String.format("[%s]", String.join(", ",
+                slices.toArray(new String[slices.size()])
+            ));
+    }
+
     private String createArray(
             int resolution, int extentY, int extentX)
                     throws TileDBError {
@@ -234,7 +250,8 @@ public class Main implements AutoCloseable {
             query.setDataBuffer("a1", asByteBuffer);
             QueryStatus status = query.submit();
             System.out.println(String.format(
-                    "Inserted rectangle: [%d, %d]; status: %s", x0, y0, status));
+                    "Inserted rectangle: %s; status: %s",
+                    _toString(subarray), status));
         }
     }
 
@@ -295,6 +312,9 @@ public class Main implements AutoCloseable {
                 for (int t = 0; t < sizeT; t++) {
                     for (int c = 0; c < sizeC; c++) {
                         for (int z = 0; z < sizeZ; z++) {
+                            System.out.println(String.format(
+                                "Calculate resolution zero for T:%d C:%d Z:%d",
+                                t, c, z));
                             calculateResolutionZero(ctx, array, t, c, z);
                         }
                     }
@@ -357,7 +377,10 @@ public class Main implements AutoCloseable {
           sourceSubarray.addRange(4, sourceX0, sourceX1, null);
           sourceQuery.setSubarray(sourceSubarray);
           sourceQuery.setDataBuffer("a1", sourceBuffer);
-          sourceQuery.submit();
+          QueryStatus sourceStatus = sourceQuery.submit();
+          System.out.println(String.format(
+                  "Read rectangle: %s; status: %s",
+                  _toString(sourceSubarray), sourceStatus));
 
           // Destination buffer will be a correctly sized slice of the
           // original source buffer and consequently does not need to be
@@ -372,7 +395,10 @@ public class Main implements AutoCloseable {
           destinationSubarray.addRange(4, x0, x1, null);
           destinationQuery.setSubarray(destinationSubarray);
           destinationQuery.setDataBuffer("a1", destinationBuffer);
-          destinationQuery.submit();
+          QueryStatus destinationStatus = destinationQuery.submit();
+          System.out.println(String.format(
+                  "Write rectangle: %s; status: %s",
+                  _toString(destinationSubarray), destinationStatus));
        }
     }
 
@@ -427,6 +453,10 @@ public class Main implements AutoCloseable {
                     try (Config config = createConfig();
                          Context ctx = new Context(config)) {
                         for (int z = 0; z < sizeZ; z++) {
+                            System.out.println(String.format(
+                                    "Calculate resolution zero for " +
+                                    "Resolution:%d T:%d C:%d Z:%d",
+                                    resolution, t, c, z));
                             calculatePyramid(ctx, resolution, t, c, z);
                         }
                     }
