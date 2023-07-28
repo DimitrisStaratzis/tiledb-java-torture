@@ -425,7 +425,7 @@ public class Main implements AutoCloseable {
           destinationQuery.setDataBuffer("a1", destinationBuffer);
           QueryStatus destinationStatus = destinationQuery.submit();
           System.out.println(String.format(
-                  "Write rectangle: %s; status: %s",
+                  "Wrote rectangle: %s; status: %s",
                   _toString(destinationSubarray), destinationStatus));
        }
     }
@@ -482,7 +482,7 @@ public class Main implements AutoCloseable {
                          Context ctx = new Context(config)) {
                         for (int z = 0; z < sizeZ; z++) {
                             System.out.println(String.format(
-                                    "Calculate resolution zero for " +
+                                    "Calculate pyramid for " +
                                     "Resolution:%d T:%d C:%d Z:%d",
                                     resolution, t, c, z));
                             calculatePyramid(ctx, resolution, t, c, z);
