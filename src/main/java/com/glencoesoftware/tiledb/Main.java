@@ -45,6 +45,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.Attribute;
@@ -65,6 +68,9 @@ import loci.common.image.IImageScaler;
 import loci.common.image.SimpleImageScaler;
 
 public class Main implements AutoCloseable {
+
+    /** Logger */
+    private static final Logger log = LoggerFactory.getLogger(Main.class);
 
     /** Tile size in the X dimension */
     private final int tileSizeX = 1000;
@@ -131,8 +137,7 @@ public class Main implements AutoCloseable {
             main.calculateResolutionZero();
             main.calculatePyramid();
         } catch (Exception e) {
-            System.err.println("Exception during execution");
-            e.printStackTrace();
+            log.error("Exception during execution", e);
         }
     }
 
@@ -142,7 +147,7 @@ public class Main implements AutoCloseable {
             Paths.get("").toAbsolutePath(),  // Current working directory
             "tiledb_"
         );
-        System.out.println("TileDB root is: " + tileDbRoot);
+        log.info("TileDB root is: {}", tileDbRoot);
 
         // Don't consolidate
         tileDbConfig = Map.of();
@@ -241,7 +246,7 @@ public class Main implements AutoCloseable {
                 String path = tileDbRoot
                         .resolve(Integer.toString(resolution))
                         .toString();
-                System.out.println("Creating TileDB array: " + path);
+                log.info("Creating TileDB array: {}", path);
                 Array.create(path, schema);
                 return path;
             }
@@ -277,9 +282,8 @@ public class Main implements AutoCloseable {
             query.setSubarray(subarray);
             query.setDataBuffer("a1", asByteBuffer);
             QueryStatus status = query.submit();
-            System.out.println(String.format(
-                    "Inserted rectangle: %s; status: %s",
-                    _toString(subarray), status));
+            log.info("Inserted rectangle: {}; status: {}",
+                    _toString(subarray), status);
         }
     }
 
@@ -318,11 +322,10 @@ public class Main implements AutoCloseable {
     private void consolidate(String uri) throws TileDBError {
         if (tileDbConfig.keySet().stream()
                 .noneMatch(v -> v.startsWith("sm.consolidate"))) {
-            System.out.println("Not consolidating " + uri);
+            log.info("Not consolidating {}", uri);
             return;
         }
-        System.out.println(
-                "Consolidating " + uri + " based on TileDB configuration");
+        log.info("Consolidating {} based on TileDB configuration", uri);
         try (Config config = createConfig();
              Context ctx = new Context(config)) {
             Array.consolidate(ctx, uri, config);
@@ -340,9 +343,9 @@ public class Main implements AutoCloseable {
                 for (int t = 0; t < sizeT; t++) {
                     for (int c = 0; c < sizeC; c++) {
                         for (int z = 0; z < sizeZ; z++) {
-                            System.out.println(String.format(
-                                "Calculate resolution zero for T:%d C:%d Z:%d",
-                                t, c, z));
+                            log.info(
+                                "Calculate resolution zero for T:{} C:{} Z:{}",
+                                t, c, z);
                             calculateResolutionZero(ctx, array, t, c, z);
                         }
                     }
@@ -406,9 +409,8 @@ public class Main implements AutoCloseable {
           sourceQuery.setSubarray(sourceSubarray);
           sourceQuery.setDataBuffer("a1", sourceBuffer);
           QueryStatus sourceStatus = sourceQuery.submit();
-          System.out.println(String.format(
-                  "Read rectangle: %s; status: %s",
-                  _toString(sourceSubarray), sourceStatus));
+          log.info("Read rectangle: {}; status: {}",
+                  _toString(sourceSubarray), sourceStatus);
 
           // Destination buffer will be a correctly sized slice of the
           // original source buffer and consequently does not need to be
@@ -424,9 +426,8 @@ public class Main implements AutoCloseable {
           destinationQuery.setSubarray(destinationSubarray);
           destinationQuery.setDataBuffer("a1", destinationBuffer);
           QueryStatus destinationStatus = destinationQuery.submit();
-          System.out.println(String.format(
-                  "Wrote rectangle: %s; status: %s",
-                  _toString(destinationSubarray), destinationStatus));
+          log.info("Wrote rectangle: {}; status: {}",
+                  _toString(destinationSubarray), destinationStatus);
        }
     }
 
@@ -481,10 +482,9 @@ public class Main implements AutoCloseable {
                     try (Config config = createConfig();
                          Context ctx = new Context(config)) {
                         for (int z = 0; z < sizeZ; z++) {
-                            System.out.println(String.format(
-                                    "Calculate pyramid for " +
-                                    "Resolution:%d T:%d C:%d Z:%d",
-                                    resolution, t, c, z));
+                            log.info("Calculate pyramid for " +
+                                    "Resolution:{} T:{} C:{} Z:{}",
+                                    resolution, t, c, z);
                             calculatePyramid(ctx, resolution, t, c, z);
                         }
                     }
