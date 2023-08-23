@@ -45,9 +45,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.perf4j.slf4j.Slf4JStopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import ch.qos.logback.classic.Level;
 import io.tiledb.java.api.Array;
 import io.tiledb.java.api.ArraySchema;
 import io.tiledb.java.api.Attribute;
@@ -71,6 +73,9 @@ public class Main implements AutoCloseable {
 
     /** Logger */
     private static final Logger log = LoggerFactory.getLogger(Main.class);
+
+    /** Switch root logger to DEBUG level? */
+    private static final boolean debug = false;
 
     /** Tile size in the X dimension */
     private final int tileSizeX = 1000;
@@ -134,6 +139,13 @@ public class Main implements AutoCloseable {
 
     public static void main(String[] args) throws Exception {
         try (Main main = new Main()) {
+            if (debug) {
+                // Don't pollute the output with timings
+                ch.qos.logback.classic.Logger root =
+                        (ch.qos.logback.classic.Logger)
+                            LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+                root.setLevel(Level.DEBUG);
+            }
             main.calculateResolutionZero();
             main.calculatePyramid();
         } catch (Exception e) {
@@ -271,6 +283,8 @@ public class Main implements AutoCloseable {
         ByteBuffer asByteBuffer = ByteBuffer
             .allocateDirect(area * bytesPerPixel)
             .order(ByteOrder.nativeOrder());
+        Slf4JStopWatch t0 = new Slf4JStopWatch("TileDB.writeBlock()");
+        t0.setNormalPriority(Slf4JStopWatch.DEBUG_LEVEL);
         try (Query query = new Query(array, TILEDB_WRITE);
              SubArray subarray = new SubArray(ctx, array)) {
             query.setLayout(TILEDB_ROW_MAJOR);
@@ -282,8 +296,21 @@ public class Main implements AutoCloseable {
             query.setSubarray(subarray);
             query.setDataBuffer("a1", asByteBuffer);
             QueryStatus status = query.submit();
+            t0.stop();
             log.info("Inserted rectangle: {}; status: {}",
                     _toString(subarray), status);
+            Slf4JStopWatch t1 = new Slf4JStopWatch("Query.close()");
+            try {
+                query.close();
+            } finally {
+                t1.stop();
+            }
+            Slf4JStopWatch t2 = new Slf4JStopWatch("Subarray.close()");
+            try {
+                subarray.close();
+            } finally {
+                t2.stop();
+            }
         }
     }
 
@@ -401,16 +428,22 @@ public class Main implements AutoCloseable {
              Query destinationQuery = new Query(destination, TILEDB_WRITE);
              SubArray sourceSubarray = new SubArray(ctx, source);
              SubArray destinationSubarray = new SubArray(ctx, destination)) {
-          sourceSubarray.addRange(0, t, t, null);
-          sourceSubarray.addRange(1, c, c, null);
-          sourceSubarray.addRange(2, z, z, null);
-          sourceSubarray.addRange(3, sourceY0, sourceY1, null);
-          sourceSubarray.addRange(4, sourceX0, sourceX1, null);
-          sourceQuery.setSubarray(sourceSubarray);
-          sourceQuery.setDataBuffer("a1", sourceBuffer);
-          QueryStatus sourceStatus = sourceQuery.submit();
-          log.info("Read rectangle: {}; status: {}",
-                  _toString(sourceSubarray), sourceStatus);
+          Slf4JStopWatch t0 = new Slf4JStopWatch("TileDB.readBlock()");
+          t0.setNormalPriority(Slf4JStopWatch.DEBUG_LEVEL);
+          try {
+              sourceSubarray.addRange(0, t, t, null);
+              sourceSubarray.addRange(1, c, c, null);
+              sourceSubarray.addRange(2, z, z, null);
+              sourceSubarray.addRange(3, sourceY0, sourceY1, null);
+              sourceSubarray.addRange(4, sourceX0, sourceX1, null);
+              sourceQuery.setSubarray(sourceSubarray);
+              sourceQuery.setDataBuffer("a1", sourceBuffer);
+              QueryStatus sourceStatus = sourceQuery.submit();
+              log.info("Read rectangle: {}; status: {}",
+                      _toString(sourceSubarray), sourceStatus);
+          } finally {
+              t0.stop();
+          }
 
           // Destination buffer will be a correctly sized slice of the
           // original source buffer and consequently does not need to be
@@ -418,16 +451,47 @@ public class Main implements AutoCloseable {
           ByteBuffer destinationBuffer =
                   downsampleTileSIS(sourceBuffer, sourceSize);
 
-          destinationSubarray.addRange(0, t, t, null);
-          destinationSubarray.addRange(1, c, c, null);
-          destinationSubarray.addRange(2, z, z, null);
-          destinationSubarray.addRange(3, y0, y1, null);
-          destinationSubarray.addRange(4, x0, x1, null);
-          destinationQuery.setSubarray(destinationSubarray);
-          destinationQuery.setDataBuffer("a1", destinationBuffer);
-          QueryStatus destinationStatus = destinationQuery.submit();
-          log.info("Wrote rectangle: {}; status: {}",
-                  _toString(destinationSubarray), destinationStatus);
+          Slf4JStopWatch t1 = new Slf4JStopWatch("TileDB.writeBlock()");
+          t1.setNormalPriority(Slf4JStopWatch.DEBUG_LEVEL);
+          try {
+              destinationSubarray.addRange(0, t, t, null);
+              destinationSubarray.addRange(1, c, c, null);
+              destinationSubarray.addRange(2, z, z, null);
+              destinationSubarray.addRange(3, y0, y1, null);
+              destinationSubarray.addRange(4, x0, x1, null);
+              destinationQuery.setSubarray(destinationSubarray);
+              destinationQuery.setDataBuffer("a1", destinationBuffer);
+              QueryStatus destinationStatus = destinationQuery.submit();
+              log.info("Wrote rectangle: {}; status: {}",
+                      _toString(destinationSubarray), destinationStatus);
+          } finally {
+              t1.stop();
+          }
+
+          Slf4JStopWatch t2 = new Slf4JStopWatch("SourceQuery.close()");
+          try {
+              sourceQuery.close();
+          } finally {
+              t2.stop();
+          }
+          Slf4JStopWatch t3 = new Slf4JStopWatch("DestinationQuery.close()");
+          try {
+              destinationQuery.close();
+          } finally {
+              t3.stop();
+          }
+          Slf4JStopWatch t4 = new Slf4JStopWatch("SourceSubarray.close()");
+          try {
+              sourceSubarray.close();
+          } finally {
+              t4.stop();
+          }
+          Slf4JStopWatch t5 = new Slf4JStopWatch("DestinationSubarray.close()");
+          try {
+              destinationSubarray.close();
+          } finally {
+              t5.stop();
+          }
        }
     }
 
