@@ -73,9 +73,10 @@ public class Main implements AutoCloseable {
 
     /** Logger */
     private static final Logger log = LoggerFactory.getLogger(Main.class);
+    static int counter = 0;
 
     /** Switch root logger to DEBUG level? */
-    private static final boolean debug = false;
+    private static final boolean debug = true;
 
     /** Tile size in the X dimension */
     private final int tileSizeX = 1000;
@@ -123,7 +124,7 @@ public class Main implements AutoCloseable {
     private final int maxWorkers = 4;
 
     /**
-     * Fixed thread pool executor of {@link maxWorkers} size where tile read
+     * Fixed thread pool executor of {maxWorkers} size where tile read
      * and write operations will be performed.
      */
     private final ExecutorService executor;
@@ -143,7 +144,7 @@ public class Main implements AutoCloseable {
                 // Don't pollute the output with timings
                 ch.qos.logback.classic.Logger root =
                         (ch.qos.logback.classic.Logger)
-                            LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+                                LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
                 root.setLevel(Level.DEBUG);
             }
             main.calculateResolutionZero();
@@ -154,10 +155,10 @@ public class Main implements AutoCloseable {
     }
 
     public Main() throws Exception {
-        bytesPerPixel = (int) attrType.size();
+        bytesPerPixel = (int) attrType.getNativeSize();
         tileDbRoot = Files.createTempDirectory(
-            Paths.get("").toAbsolutePath(),  // Current working directory
-            "tiledb_"
+                Paths.get("").toAbsolutePath(),  // Current working directory
+                "tiledb_"
         );
         log.info("TileDB root is: {}", tileDbRoot);
 
@@ -183,16 +184,16 @@ public class Main implements AutoCloseable {
             slices.add(String.join(":",
                     range.getFirst().toString(),
                     range.getSecond().toString()
-                ));
+            ));
         }
         return String.format("[%s]", String.join(", ",
                 slices.toArray(new String[slices.size()])
-            ));
+        ));
     }
 
     private String createArray(
             int resolution, int extentY, int extentX)
-                    throws TileDBError {
+            throws TileDBError {
         try (Context ctx = new Context()) {
             // Dimension AutoClosable native memory cleanup will be performed by
             // the closure of the domain below.
@@ -248,7 +249,7 @@ public class Main implements AutoCloseable {
                         default:
                             throw new IllegalArgumentException(
                                     "Unsupported pixel type: "
-                                    + attrType);
+                                            + attrType);
                     }
                 }
 
@@ -276,49 +277,47 @@ public class Main implements AutoCloseable {
     private void writeImage(
             final Context ctx, final Array array,
             final int t, final int c, final int z, final int y0, final int x0)
-                    throws TileDBError, InterruptedException {
+            throws TileDBError, InterruptedException {
         int y1 = Math.min(y0 + tileSizeY - 1, sizeY - 1);
         int x1 = Math.min(x0 + tileSizeX - 1, sizeX - 1);
         int area = ((y1 + 1) - y0) * ((x1 + 1) - x0);
         ByteBuffer asByteBuffer = ByteBuffer
-            .allocateDirect(area * bytesPerPixel)
-            .order(ByteOrder.nativeOrder());
+                .allocateDirect(area * bytesPerPixel)
+                .order(ByteOrder.nativeOrder());
         Slf4JStopWatch t0 = new Slf4JStopWatch("TileDB.writeBlock()");
         t0.setNormalPriority(Slf4JStopWatch.DEBUG_LEVEL);
-        try (Query query = new Query(array, TILEDB_WRITE);
-             SubArray subarray = new SubArray(ctx, array)) {
+        try (Query query = new Query(array, TILEDB_WRITE)) {
             query.setLayout(TILEDB_ROW_MAJOR);
-            subarray.addRange(0, t, t, null);
-            subarray.addRange(1, c, c, null);
-            subarray.addRange(2, z, z, null);
-            subarray.addRange(3, y0, y1, null);
-            subarray.addRange(4, x0, x1, null);
-            query.setSubarray(subarray);
-            query.setDataBuffer("a1", asByteBuffer);
+            query.addRange(0, t, t);
+            query.addRange(1, c, c);
+            query.addRange(2, z, z);
+            query.addRange(3, y0, y1);
+            query.addRange(4, x0, x1);
+            query.setBuffer("a1", asByteBuffer);
             QueryStatus status = query.submit();
             t0.stop();
             log.info("Inserted rectangle: {}; status: {}",
-                    _toString(subarray), status);
+                    "", status);
             Slf4JStopWatch t1 = new Slf4JStopWatch("Query.close()");
             try {
                 query.close();
             } finally {
                 t1.stop();
             }
-            Slf4JStopWatch t2 = new Slf4JStopWatch("Subarray.close()");
-            try {
-                subarray.close();
-            } finally {
-                t2.stop();
-            }
+//            Slf4JStopWatch t2 = new Slf4JStopWatch("Subarray.close()");
+//            try {
+//                subarray.close();
+//            } finally {
+//                t2.stop();
+//            }
         }
     }
 
     private void calculateResolutionZero(
             final Context ctx, final Array array,
             final int t, final int c, final int z)
-                    throws InterruptedException, ExecutionException,
-                            TileDBError {
+            throws InterruptedException, ExecutionException,
+            TileDBError {
         List<CompletableFuture<Void>> futures =
                 new ArrayList<CompletableFuture<Void>>();
         int gridSizeY = (int) Math.ceil((double) sizeY / tileSizeY);
@@ -362,7 +361,7 @@ public class Main implements AutoCloseable {
 
     void calculateResolutionZero()
             throws InterruptedException, ExecutionException,
-                IOException, TileDBError {
+            IOException, TileDBError {
         String uri = createArray(0, tileSizeY, tileSizeX);
         try (Config config = createConfig();
              Context ctx = new Context(config)) {
@@ -371,8 +370,8 @@ public class Main implements AutoCloseable {
                     for (int c = 0; c < sizeC; c++) {
                         for (int z = 0; z < sizeZ; z++) {
                             log.info(
-                                "Calculate resolution zero for T:{} C:{} Z:{}",
-                                t, c, z);
+                                    "Calculate resolution zero for T:{} C:{} Z:{}",
+                                    t, c, z);
                             calculateResolutionZero(ctx, array, t, c, z);
                         }
                     }
@@ -404,7 +403,7 @@ public class Main implements AutoCloseable {
             final Context ctx, final Array source, final Array destination,
             final int resolution, final int t, final int c, final int z,
             final int y0, final int x0)
-                    throws TileDBError, InterruptedException {
+            throws TileDBError, InterruptedException {
         // Source offsets, pyramid scale is 2
         int factor = (int) Math.pow(2, resolution);
         int previousFactor = (int) Math.pow(2, resolution - 1);
@@ -425,81 +424,78 @@ public class Main implements AutoCloseable {
                 .allocateDirect(sourceSize.height * sourceSize.width * bytesPerPixel)
                 .order(ByteOrder.nativeOrder());
         try (Query sourceQuery = new Query(source, TILEDB_READ);
-             Query destinationQuery = new Query(destination, TILEDB_WRITE);
-             SubArray sourceSubarray = new SubArray(ctx, source);
-             SubArray destinationSubarray = new SubArray(ctx, destination)) {
-          Slf4JStopWatch t0 = new Slf4JStopWatch("TileDB.readBlock()");
-          t0.setNormalPriority(Slf4JStopWatch.DEBUG_LEVEL);
-          try {
-              sourceSubarray.addRange(0, t, t, null);
-              sourceSubarray.addRange(1, c, c, null);
-              sourceSubarray.addRange(2, z, z, null);
-              sourceSubarray.addRange(3, sourceY0, sourceY1, null);
-              sourceSubarray.addRange(4, sourceX0, sourceX1, null);
-              sourceQuery.setSubarray(sourceSubarray);
-              sourceQuery.setDataBuffer("a1", sourceBuffer);
-              QueryStatus sourceStatus = sourceQuery.submit();
-              log.info("Read rectangle: {}; status: {}",
-                      _toString(sourceSubarray), sourceStatus);
-          } finally {
-              t0.stop();
-          }
+             Query destinationQuery = new Query(destination, TILEDB_WRITE);) {
 
-          // Destination buffer will be a correctly sized slice of the
-          // original source buffer and consequently does not need to be
-          // separately released
-          ByteBuffer destinationBuffer =
-                  downsampleTileSIS(sourceBuffer, sourceSize);
+            Slf4JStopWatch t0 = new Slf4JStopWatch("TileDB.readBlock()");
+            t0.setNormalPriority(Slf4JStopWatch.DEBUG_LEVEL);
+            try {
+                sourceQuery.addRange(0, t, t);
+                sourceQuery.addRange(1, c, c);
+                sourceQuery.addRange(2, z, z);
+                sourceQuery.addRange(3, sourceY0, sourceY1);
+                sourceQuery.addRange(4, sourceX0, sourceX1);
+                sourceQuery.setBuffer("a1", sourceBuffer);
+                QueryStatus sourceStatus = sourceQuery.submit();
+                log.info("Read rectangle: {}; status: {}",
+                        "", sourceStatus);
+            } finally {
+                t0.stop();
+            }
 
-          Slf4JStopWatch t1 = new Slf4JStopWatch("TileDB.writeBlock()");
-          t1.setNormalPriority(Slf4JStopWatch.DEBUG_LEVEL);
-          try {
-              destinationSubarray.addRange(0, t, t, null);
-              destinationSubarray.addRange(1, c, c, null);
-              destinationSubarray.addRange(2, z, z, null);
-              destinationSubarray.addRange(3, y0, y1, null);
-              destinationSubarray.addRange(4, x0, x1, null);
-              destinationQuery.setSubarray(destinationSubarray);
-              destinationQuery.setDataBuffer("a1", destinationBuffer);
-              QueryStatus destinationStatus = destinationQuery.submit();
-              log.info("Wrote rectangle: {}; status: {}",
-                      _toString(destinationSubarray), destinationStatus);
-          } finally {
-              t1.stop();
-          }
+            // Destination buffer will be a correctly sized slice of the
+            // original source buffer and consequently does not need to be
+            // separately released
+            ByteBuffer destinationBuffer =
+                    downsampleTileSIS(sourceBuffer, sourceSize);
 
-          Slf4JStopWatch t2 = new Slf4JStopWatch("SourceQuery.close()");
-          try {
-              sourceQuery.close();
-          } finally {
-              t2.stop();
-          }
-          Slf4JStopWatch t3 = new Slf4JStopWatch("DestinationQuery.close()");
-          try {
-              destinationQuery.close();
-          } finally {
-              t3.stop();
-          }
-          Slf4JStopWatch t4 = new Slf4JStopWatch("SourceSubarray.close()");
-          try {
-              sourceSubarray.close();
-          } finally {
-              t4.stop();
-          }
-          Slf4JStopWatch t5 = new Slf4JStopWatch("DestinationSubarray.close()");
-          try {
-              destinationSubarray.close();
-          } finally {
-              t5.stop();
-          }
-       }
+            Slf4JStopWatch t1 = new Slf4JStopWatch("TileDB.writeBlock()");
+            t1.setNormalPriority(Slf4JStopWatch.DEBUG_LEVEL);
+            try {
+                destinationQuery.addRange(0, t, t);
+                destinationQuery.addRange(1, c, c);
+                destinationQuery.addRange(2, z, z);
+                destinationQuery.addRange(3, y0, y1);
+                destinationQuery.addRange(4, x0, x1);
+                destinationQuery.setBuffer("a1", destinationBuffer);
+                QueryStatus destinationStatus = destinationQuery.submit();
+                log.info("Wrote rectangle: {}; status: {}",
+                        "", destinationStatus);
+            } finally {
+                t1.stop();
+            }
+
+            Slf4JStopWatch t2 = new Slf4JStopWatch("SourceQuery.close()");
+            try {
+                sourceQuery.close();
+            } finally {
+                t2.stop();
+            }
+            Slf4JStopWatch t3 = new Slf4JStopWatch("DestinationQuery.close()");
+            try {
+                destinationQuery.close();
+            } finally {
+                t3.stop();
+            }
+//          Slf4JStopWatch t4 = new Slf4JStopWatch("SourceSubarray.close()");
+//          try {
+//              sourceSubarray.close();
+//          } finally {
+//              t4.stop();
+//          }
+//          Slf4JStopWatch t5 = new Slf4JStopWatch("DestinationSubarray.close()");
+//          try {
+//              destinationSubarray.close();
+//          } finally {
+//              t5.stop();
+//          }
+        }
     }
 
     private void calculatePyramid(
             final Context ctx, final int resolution, final int t, final int c,
             final int z)
-                    throws InterruptedException, ExecutionException,
-                    IOException, TileDBError {
+            throws InterruptedException, ExecutionException,
+            IOException, TileDBError {
         String sourceRoot = tileDbRoot.resolve(
                 Integer.toString(resolution - 1)).toString();
         String destinationRoot = tileDbRoot.resolve(
@@ -520,7 +516,7 @@ public class Main implements AutoCloseable {
                     executor.execute(() -> {
                         try {
                             processTile(
-                                ctx, source, destination, resolution, t, c, z, y, x);
+                                    ctx, source, destination, resolution, t, c, z, y, x);
                             future.complete(null);
                         } catch (Exception e) {
                             future.completeExceptionally(e);
@@ -531,13 +527,13 @@ public class Main implements AutoCloseable {
             // Wait until the entire resolution has completed before proceeding
             // to the next one
             CompletableFuture.allOf(
-                futures.toArray(new CompletableFuture[futures.size()])).join();
+                    futures.toArray(new CompletableFuture[futures.size()])).join();
         }
     }
 
     void calculatePyramid()
             throws InterruptedException, ExecutionException, IOException,
-                TileDBError {
+            TileDBError {
         for (int resolution = 1; resolution < resolutions; resolution++) {
             String uri = createArray(
                     resolution, tileSizeY, tileSizeX);
@@ -547,7 +543,7 @@ public class Main implements AutoCloseable {
                          Context ctx = new Context(config)) {
                         for (int z = 0; z < sizeZ; z++) {
                             log.info("Calculate pyramid for " +
-                                    "Resolution:{} T:{} C:{} Z:{}",
+                                            "Resolution:{} T:{} C:{} Z:{}",
                                     resolution, t, c, z);
                             calculatePyramid(ctx, resolution, t, c, z);
                         }
